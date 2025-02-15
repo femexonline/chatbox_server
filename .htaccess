@@ -1,0 +1,4 @@
+RewriteEngine On
+RewriteCond %{HTTP:Upgrade} =websocket [NC]
+RewriteCond %{REQUEST_URI} ^/ws [NC]
+RewriteRule /(.*) ws://localhost:8080/$1 [P,L]
