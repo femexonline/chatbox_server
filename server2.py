@@ -2,15 +2,47 @@ import asyncio
 import websockets
 
 
+admins={}
+users={}
+
+
+def processUser(userid, isAdmin, sockeetId, websocket):
+    if(not isAdmin):
+        if(userid not in users):
+            users[userid]={}
+
+        if(sockeetId not in users[userid]):
+            users[userid][sockeetId]=websocket
+
+    else:
+        if(userid not in admins):
+            admins[userid]={}
+
+        if(sockeetId not in admins[userid]):
+            admins[userid][sockeetId]=websocket
+        
+    print(userid, isAdmin, sockeetId)
+
 
 async def handle_connection(websocket, path):
     print("A client connected!")
+
+    data=path.split("/")
+    userid=data[1]
+    isAdmin=int(data[2])
+    sockeetId=data[3]
+    
+    processUser(userid, isAdmin, sockeetId, websocket)
+
     try:
         while True:
             # Set a timeout for receiving messages
             message = await asyncio.wait_for(websocket.recv(), timeout=10)  # 10 seconds timeout
-            print(f"Received message: {message} {path}")
-            await websocket.send(f"Server received: {message}")
+            if(message):
+                print(users)
+                print(admins)
+                print(f"Received message: {message} {path}")
+                await websocket.send(f"Server received: {message}")
     except asyncio.TimeoutError:
         print("Client timed out - no messages received for 10 seconds")
     except websockets.ConnectionClosed:
