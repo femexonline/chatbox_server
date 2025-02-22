@@ -1,9 +1,42 @@
 import asyncio
 import websockets
+from websockets import WebSocketServerProtocol
+import json
+
+from db_endpoints import EndPoints
 
 
 admins={}
 users={}
+
+class Pings:
+    @staticmethod
+    async def msgSent(resData, msgSendingID, userid, isAdmin, sockeetId):
+        send=[
+            "msgsent",
+            resData["msg"],
+            msgSendingID,
+            resData["isErr"],
+            resData["err"],
+        ]
+
+
+        #     websocket.closed
+        user_sockets={}
+        if(isAdmin):
+            user_sockets=admins
+        else:
+            user_sockets=users
+
+        if(userid in user_sockets):
+            for socId in user_sockets[userid]:
+                webSoc:WebSocketServerProtocol=user_sockets[userid][socId]
+
+                webSoc.send(json.dumps(send))
+
+        
+
+
 
 
 def processUser(userid, isAdmin, sockeetId, websocket):
@@ -23,8 +56,32 @@ def processUser(userid, isAdmin, sockeetId, websocket):
         
     print(userid, isAdmin, sockeetId)
 
+async def recieveMessage(message, userid, isAdmin, sockeetId):
+    message=json.dumps(message)
+    print(message)
+    type=message[0]
 
-async def handle_connection(websocket, path):
+    if(type=="sendmsg"):
+        sendmsg(message, userid, isAdmin, sockeetId)
+
+
+    def sendmsg(message:list, userid, isAdmin, sockeetId):
+        userID=message[1]
+        chatID=message[2]
+        msgSendingID=message[3]
+        msg=message[4]
+        resId=message[5]
+
+        resData=EndPoints.sendMsg(userID, chatID, msg, resId)
+
+        Pings.msgSent(resData, msgSendingID, userid, isAdmin, sockeetId)
+
+
+
+
+
+
+async def handle_connection(websocket:WebSocketServerProtocol, path):
     print("A client connected!")
 
     data=path.split("/")
@@ -34,15 +91,16 @@ async def handle_connection(websocket, path):
     
     processUser(userid, isAdmin, sockeetId, websocket)
 
+    print(type(websocket))
+
     try:
         while True:
             # Set a timeout for receiving messages
             message = await asyncio.wait_for(websocket.recv(), timeout=10)  # 10 seconds timeout
             if(message):
                 print(users)
-                print(admins)
-                print(f"Received message: {message} {path}")
-                await websocket.send(f"Server received: {message}")
+                recieveMessage(message, userid, isAdmin, sockeetId)
+                # await websocket.send(f"Server received: {message}")
     except asyncio.TimeoutError:
         print("Client timed out - no messages received for 10 seconds")
     except websockets.ConnectionClosed:
