@@ -83,8 +83,37 @@ class MessageConnector:
         return res
 
 
+class ChatCnnector:
+    @staticmethod
+    def getChatByid(id):
+        mycursor = mydb.cursor(dictionary=True)
+
+        mycursor.execute("SELECT * FROM chats WHERE id='"+str(id)+"'")
+
+        myresult = mycursor.fetchone()
+
+        return myresult
+
+    @staticmethod
+    def setChatAdmin(id, admin_id):
+        mycursor = mydb.cursor()
+
+        sql = "UPDATE chats SET admin_id = '"+str(admin_id)+"' WHERE id = '"+str(id)+"'"
+
+        mycursor.execute(sql)
+
+        mydb.commit()
+
 class EndPoints:
 
     @staticmethod
     def sendMsg(userID, chatID, msg, resId):
         return MessageConnector.sendDirectMsg(userID, chatID, msg, resId)
+
+    @staticmethod
+    def getChatData(id):
+        return ChatCnnector.getChatByid(id)
+    
+    @staticmethod
+    def setChatAdmin(id, admin_id):
+        return ChatCnnector.setChatAdmin(id, admin_id)

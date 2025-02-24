@@ -11,7 +11,7 @@ users={}
 
 class Pings:
     @staticmethod
-    async def msgSent(resData, msgSendingID, userid, isAdmin, sockeetId):
+    async def msgSent(resData, msgSendingID, senderId, isAdmin, sockeetId):
         send=[
             "msgsent",
             resData["msg"],
@@ -21,20 +21,139 @@ class Pings:
         ]
 
 
-        #     websocket.closed
         user_sockets={}
         if(isAdmin):
             user_sockets=admins
         else:
             user_sockets=users
 
-        if(userid in user_sockets):
-            for socId in user_sockets[userid]:
-                webSoc:WebSocketServerProtocol=user_sockets[userid][socId]
+        if(senderId in user_sockets):
+            for socId in user_sockets[senderId]:
+                webSoc:WebSocketServerProtocol=user_sockets[senderId][socId]
+                if(not webSoc.closed):
+                    await webSoc.send(json.dumps(send))
+    
+    @staticmethod
+    async def notTheAdmin(chatID, senderId):
+        send=[
+            "nottheadmin",
+            chatID,
+        ]
 
-                webSoc.send(json.dumps(send))
+        if(senderId in admins):
+            for socId in admins[senderId]:
+                webSoc:WebSocketServerProtocol=admins[senderId][socId]
+                if(not webSoc.closed):
+                    await webSoc.send(json.dumps(send))
+
+    @staticmethod
+    async def notTheAdmins(chatID, senderId):
+        send=[
+            "nottheadmins",
+            chatID,
+        ]
+
+        for adminId in admins:
+            if(senderId!=adminId):
+                for socId in admins[adminId]:
+                    webSoc:WebSocketServerProtocol=admins[adminId][socId]
+                    if(not webSoc.closed):
+                        await webSoc.send(json.dumps(send))
+
+
+    @staticmethod
+    async def newMsg(chatData, resData, senderId, isAdmin, sockeetId):
+        if(resData["isErr"]):
+            return
+        
+        newAdmin=None
+        if(isAdmin):
+            if(not chatData["admin_id"]):
+                newAdmin=senderId
+                None
+        
+        send=[
+            "newmsg",
+            resData["msg"],
+            newAdmin
+        ]
+
+        # send to all admin if no admin
+        if(not isAdmin):
+            if(not chatData["admin_id"]):
+
+                for adminId in admins:
+                    for socId in admins[adminId]:
+                        webSoc:WebSocketServerProtocol=admins[adminId][socId]
+                        if(not webSoc.closed):
+                            await webSoc.send(json.dumps(send))
+            
+                return
+
+
+
+        user_sockets={}
+        recieverId=0
+        if(isAdmin):
+            user_sockets=users
+            recieverId=chatData["user_id"]
+        else:
+            user_sockets=admins
+            recieverId=chatData["admin_id"]
 
         
+        if(recieverId in user_sockets):
+            for socId in user_sockets[recieverId]:
+                webSoc:WebSocketServerProtocol=user_sockets[recieverId][socId]
+                if(not webSoc.closed):
+                    await webSoc.send(json.dumps(send))
+
+        if(isAdmin):
+            if(newAdmin):
+                await Pings.notTheAdmins(chatData["id"], senderId)
+
+
+
+class SocketMsgRecieve:
+    @staticmethod
+    async def recieve(message, userid, isAdmin, sockeetId):
+
+
+        message=json.loads(message)
+        msg_type=message[0]
+
+        print("type", msg_type)
+        print(message)
+        print(type(message))
+
+        if(msg_type=="sendmsg"):
+            await SocketMsgRecieve._sendmsg(message, userid, isAdmin, sockeetId)
+
+
+    @staticmethod
+    async def _sendmsg(message:list, senderId, isAdmin, sockeetId):
+        chatID=message[1]
+        msgSendingID=message[2]
+        msg=message[3]
+        resId=message[4]
+
+
+        chatData=EndPoints.getChatData(chatID)
+        if(isAdmin):
+            if(not chatData["admin_id"]):
+                EndPoints.setChatAdmin(chatID, senderId)
+            else:
+                if(chatData["admin_id"] != senderId):
+                    await Pings.notTheAdmin(chatID, senderId)
+                    return
+
+
+        resData=EndPoints.sendMsg(senderId, chatID, msg, resId)
+
+        await Pings.msgSent(resData, msgSendingID, senderId, isAdmin, sockeetId)
+        await Pings.newMsg(chatData, resData, senderId, isAdmin, sockeetId)
+
+
 
 
 
@@ -56,26 +175,6 @@ def processUser(userid, isAdmin, sockeetId, websocket):
         
     print(userid, isAdmin, sockeetId)
 
-async def recieveMessage(message, userid, isAdmin, sockeetId):
-    message=json.dumps(message)
-    print(message)
-    type=message[0]
-
-    if(type=="sendmsg"):
-        sendmsg(message, userid, isAdmin, sockeetId)
-
-
-    def sendmsg(message:list, userid, isAdmin, sockeetId):
-        userID=message[1]
-        chatID=message[2]
-        msgSendingID=message[3]
-        msg=message[4]
-        resId=message[5]
-
-        resData=EndPoints.sendMsg(userID, chatID, msg, resId)
-
-        Pings.msgSent(resData, msgSendingID, userid, isAdmin, sockeetId)
-
 
 
 
@@ -91,15 +190,14 @@ async def handle_connection(websocket:WebSocketServerProtocol, path):
     
     processUser(userid, isAdmin, sockeetId, websocket)
 
-    print(type(websocket))
 
     try:
         while True:
             # Set a timeout for receiving messages
             message = await asyncio.wait_for(websocket.recv(), timeout=10)  # 10 seconds timeout
             if(message):
-                print(users)
-                recieveMessage(message, userid, isAdmin, sockeetId)
+                print(sockeetId)
+                await SocketMsgRecieve.recieve(message, userid, isAdmin, sockeetId)
                 # await websocket.send(f"Server received: {message}")
     except asyncio.TimeoutError:
         print("Client timed out - no messages received for 10 seconds")
