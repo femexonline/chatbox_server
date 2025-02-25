@@ -101,7 +101,9 @@ class Pings:
             user_sockets=admins
             recieverId=chatData["admin_id"]
 
-        
+        recieverId=str(recieverId)
+
+        # print(user_sockets[int(recieverId)])
         if(recieverId in user_sockets):
             for socId in user_sockets[recieverId]:
                 webSoc:WebSocketServerProtocol=user_sockets[recieverId][socId]
@@ -122,10 +124,6 @@ class SocketMsgRecieve:
         message=json.loads(message)
         msg_type=message[0]
 
-        print("type", msg_type)
-        print(message)
-        print(type(message))
-
         if(msg_type=="sendmsg"):
             await SocketMsgRecieve._sendmsg(message, userid, isAdmin, sockeetId)
 
@@ -143,7 +141,7 @@ class SocketMsgRecieve:
             if(not chatData["admin_id"]):
                 EndPoints.setChatAdmin(chatID, senderId)
             else:
-                if(chatData["admin_id"] != senderId):
+                if(int(chatData["admin_id"]) != int(senderId)):
                     await Pings.notTheAdmin(chatID, senderId)
                     return
 
@@ -173,8 +171,6 @@ def processUser(userid, isAdmin, sockeetId, websocket):
         if(sockeetId not in admins[userid]):
             admins[userid][sockeetId]=websocket
         
-    print(userid, isAdmin, sockeetId)
-
 
 
 
@@ -194,11 +190,10 @@ async def handle_connection(websocket:WebSocketServerProtocol, path):
     try:
         while True:
             # Set a timeout for receiving messages
-            message = await asyncio.wait_for(websocket.recv(), timeout=10)  # 10 seconds timeout
+            message = await asyncio.wait_for(websocket.recv(), timeout=30)  # 10 seconds timeout
             if(message):
                 print(sockeetId)
                 await SocketMsgRecieve.recieve(message, userid, isAdmin, sockeetId)
-                # await websocket.send(f"Server received: {message}")
     except asyncio.TimeoutError:
         print("Client timed out - no messages received for 10 seconds")
     except websockets.ConnectionClosed:
