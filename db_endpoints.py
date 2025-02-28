@@ -82,8 +82,7 @@ class MessageConnector:
 
         return res
 
-
-class ChatCnnector:
+class ChatConnector:
     @staticmethod
     def getChatByid(id):
         mycursor = mydb.cursor(dictionary=True)
@@ -104,6 +103,68 @@ class ChatCnnector:
 
         mydb.commit()
 
+    @staticmethod
+    def getUserIdsConnectedAdminAndOnline(adminId):
+        mycursor = mydb.cursor(dictionary=True)
+
+        sql="SELECT c.user_id FROM chats AS c "
+        sql+="LEFT JOIN users AS u ON c.user_id=u.id "
+        sql+="WHERE u.last_seen='online' AND c.admin_id='"+str(adminId)+"'"
+
+        mycursor.execute(sql)
+
+        myresult = mycursor.fetchall()
+        data=[]
+        for d in myresult:
+            data.append(d["user_id"])
+
+        return data
+
+    @staticmethod
+    def getAdminIdsConnectedUserAndOnline(userId):
+        mycursor = mydb.cursor(dictionary=True)
+
+        sql="SELECT c.admin_id FROM chats AS c "
+        sql+="LEFT JOIN users AS u ON c.admin_id=u.id "
+        sql+="WHERE u.last_seen='online' AND c.user_id='"+str(userId)+"'"
+
+        mycursor.execute(sql)
+
+        myresult = mycursor.fetchall()
+        data=[]
+        for d in myresult:
+            data.append(d["admin_id"])
+
+        return data
+
+
+class UserConnector:
+    @staticmethod
+    def setUserOnline(userId):
+        mycursor = mydb.cursor()
+
+        sql = "UPDATE users SET last_seen = 'online' WHERE id = '"+str(userId)+"'"
+
+        mycursor.execute(sql)
+
+        mydb.commit()
+
+        return "online"
+
+    @staticmethod
+    def setUserOffline(userId):
+        mycursor = mydb.cursor()
+        time_on=int(time.time())
+
+        sql = "UPDATE users SET last_seen = '"+str(time_on)+"' WHERE id = '"+str(userId)+"'"
+
+        mycursor.execute(sql)
+
+        mydb.commit()
+
+        return time_on
+
+
 class EndPoints:
 
     @staticmethod
@@ -112,8 +173,22 @@ class EndPoints:
 
     @staticmethod
     def getChatData(id):
-        return ChatCnnector.getChatByid(id)
+        return ChatConnector.getChatByid(id)
     
     @staticmethod
     def setChatAdmin(id, admin_id):
-        return ChatCnnector.setChatAdmin(id, admin_id)
+        return ChatConnector.setChatAdmin(id, admin_id)
+    
+    @staticmethod
+    def setUseOnlineStatus(userId, isOnline):
+        if(isOnline):
+            return UserConnector.setUserOnline(userId)
+        else:
+            return UserConnector.setUserOffline(userId)
+
+    @staticmethod
+    def getAllUserToPing(userID, isAdmin):
+        if(isAdmin):
+            return ChatConnector.getUserIdsConnectedAdminAndOnline(userID)
+        else:
+            return ChatConnector.getAdminIdsConnectedUserAndOnline(userID)

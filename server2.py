@@ -114,6 +114,32 @@ class Pings:
             if(newAdmin):
                 await Pings.notTheAdmins(chatData["id"], senderId)
 
+    @staticmethod
+    async def onlineStatus(status, userId, recipients:list, senderIsAdmin:bool):
+        send=[
+            "onlinestatus",
+            status,
+            userId,
+        ]
+
+        user_sockets={}
+        if(senderIsAdmin):
+            user_sockets=users
+        else:
+            user_sockets=admins
+
+
+        for recipientId in recipients:
+            recipientId=str(recipientId)
+
+            if(recipientId in user_sockets):
+                for socId in user_sockets[recipientId]:
+                    webSoc:WebSocketServerProtocol=user_sockets[recipientId][socId]
+                    if(not webSoc.closed):
+                        await webSoc.send(json.dumps(send))
+
+
+
 
 
 class SocketMsgRecieve:
@@ -156,9 +182,12 @@ class SocketMsgRecieve:
 
 
 
-def processUser(userid, isAdmin, sockeetId, websocket):
+async def processUserEnter(userid, isAdmin, sockeetId, websocket):
+    setOnline=False
+
     if(not isAdmin):
         if(userid not in users):
+            setOnline=True
             users[userid]={}
 
         if(sockeetId not in users[userid]):
@@ -166,14 +195,49 @@ def processUser(userid, isAdmin, sockeetId, websocket):
 
     else:
         if(userid not in admins):
+            setOnline=True
             admins[userid]={}
 
         if(sockeetId not in admins[userid]):
             admins[userid][sockeetId]=websocket
+
+    if(setOnline):
+        status=EndPoints.setUseOnlineStatus(userid, True)
+
+        ids=EndPoints.getAllUserToPing(userid, isAdmin)
+        await Pings.onlineStatus(status, userid, ids, isAdmin)
+
         
+async def processUserLeave(userid, isAdmin, sockeetId):
+    setOffline=False
 
+    if(not isAdmin):
+        if(userid in users):
+            if(sockeetId in users[userid]):
+                users[userid].pop(sockeetId)
+            
+            if(not len(users[userid])):
+                users.pop(userid)
+                setOffline=True
+        else:
+            print("some err")
 
+    else:
+        if(userid in admins):
+            if(sockeetId in admins[userid]):
+                admins[userid].pop(sockeetId)
+            
+            if(not len(admins[userid])):
+                admins.pop(userid)
+                setOffline=True
+        else:
+            print("some err2")
 
+    if(setOffline):
+        status=EndPoints.setUseOnlineStatus(userid, False)
+
+        ids=EndPoints.getAllUserToPing(userid, isAdmin)
+        await Pings.onlineStatus(status, userid, ids, isAdmin)
 
 
 async def handle_connection(websocket:WebSocketServerProtocol, path):
@@ -184,7 +248,7 @@ async def handle_connection(websocket:WebSocketServerProtocol, path):
     isAdmin=int(data[2])
     sockeetId=data[3]
     
-    processUser(userid, isAdmin, sockeetId, websocket)
+    await processUserEnter(userid, isAdmin, sockeetId, websocket)
 
 
     try:
@@ -196,10 +260,13 @@ async def handle_connection(websocket:WebSocketServerProtocol, path):
                 await SocketMsgRecieve.recieve(message, userid, isAdmin, sockeetId)
     except asyncio.TimeoutError:
         print("Client timed out - no messages received for 10 seconds")
+        await processUserLeave(userid, isAdmin, sockeetId)
     except websockets.ConnectionClosed:
         print("A client disconnected")
+        await processUserLeave(userid, isAdmin, sockeetId)
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+        await processUserLeave(userid, isAdmin, sockeetId)
 
 async def main():
     async with websockets.serve(handle_connection, "localhost", 8080):
