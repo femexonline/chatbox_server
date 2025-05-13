@@ -2,6 +2,7 @@ import asyncio
 import websockets
 from websockets import WebSocketServerProtocol
 import json
+import time
 
 from db_endpoints import EndPoints
 
@@ -10,8 +11,10 @@ admins={}
 users={}
 
 class Pings:
+    # async def msgsDelivered(data, senderId, isAdmin, sockeetId):
+
     @staticmethod
-    async def msgSent(resData, msgSendingID, senderId, isAdmin, sockeetId):
+    async def msgSent(resData, msgSendingID, senderId, isAdmin):
         send=[
             "msgsent",
             resData["msg"],
@@ -62,7 +65,7 @@ class Pings:
 
 
     @staticmethod
-    async def newMsg(chatData, resData, senderId, isAdmin, sockeetId):
+    async def newMsg(chatData, resData, senderId, isAdmin):
         if(resData["isErr"]):
             return
         
@@ -138,7 +141,28 @@ class Pings:
                     if(not webSoc.closed):
                         await webSoc.send(json.dumps(send))
 
+    async def msgsDelivered(chatId, msgIds,  idToRecieve, idIsAdmin, time_del):
+        send=[
+            "msgsdelivered",
+            chatId,
+            msgIds,
+            time_del
+        ]
 
+        user_sockets={}
+        if(idIsAdmin):
+            user_sockets=admins
+        else:
+            user_sockets=users
+
+        idToRecieve=str(idToRecieve)
+        if(idToRecieve in user_sockets):
+
+            for socId in user_sockets[idToRecieve]:
+                webSoc:WebSocketServerProtocol=user_sockets[idToRecieve][socId]
+                if(not webSoc.closed):
+                    await webSoc.send(json.dumps(send))
+    
 
 
 
@@ -152,6 +176,9 @@ class SocketMsgRecieve:
 
         if(msg_type=="sendmsg"):
             await SocketMsgRecieve._sendmsg(message, userid, isAdmin, sockeetId)
+
+        if(msg_type=="msgrecvsig"):
+            await SocketMsgRecieve._msgsRecvSig(message, userid, isAdmin)
 
 
     @staticmethod
@@ -174,8 +201,40 @@ class SocketMsgRecieve:
 
         resData=EndPoints.sendMsg(senderId, chatID, msg, resId)
 
-        await Pings.msgSent(resData, msgSendingID, senderId, isAdmin, sockeetId)
-        await Pings.newMsg(chatData, resData, senderId, isAdmin, sockeetId)
+        await Pings.msgSent(resData, msgSendingID, senderId, isAdmin)
+        await Pings.newMsg(chatData, resData, senderId, isAdmin)
+
+    @staticmethod
+    async def _msgsRecvSig(message:list, senderId, isAdmin):
+        data=message[1]
+        if(not len(data)):
+           return
+
+
+        chatIds=list(data.keys())
+
+
+
+        time_del=int(time.time())
+
+        chatData=EndPoints.getChatsByIdList(chatIds)
+
+        for chatId in data:
+
+            if(chatData[chatId]):
+
+                if(chatData[chatId]["admin_id"]):
+
+                    EndPoints.markMessagesFromChatAsDelivered(chatId, data[chatId], senderId, time_del)
+
+                    idToRecieve=None
+
+                    if(isAdmin):
+                        idToRecieve=chatData[chatId]["user_id"]
+                    else:
+                        idToRecieve=chatData[chatId]["admin_id"]
+                    
+                    await Pings.msgsDelivered(chatId, data[chatId], idToRecieve, not isAdmin, time_del)
 
 
 

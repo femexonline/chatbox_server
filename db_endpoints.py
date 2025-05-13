@@ -23,6 +23,24 @@ mydb = mysql.connector.connect(
 
 
 
+
+def _convertListToSqlList(lisstData:list):
+    # // Join the array elements with commas
+    
+    res="("
+    index=0
+    for data in lisstData:
+        if(index):
+            res+=","
+        res+=str(data)
+
+        index+=1
+
+    res+=")"
+    return res
+
+
+
 class MessageConnector:
 
     @staticmethod
@@ -82,6 +100,28 @@ class MessageConnector:
 
         return res
 
+    @staticmethod
+    def markMessagesFromChatAsDelivered(chatID:int, msgIds:list, userID:int, time_del):
+        
+        if(not len(msgIds)):
+            return
+
+        ids=_convertListToSqlList(msgIds)
+
+        mycursor = mydb.cursor()
+        
+
+        # sql = "UPDATE messages SET read_status = 'delivered', deliver_time = '"+str(time_del)+"' "
+        sql = "UPDATE messages SET read_status = 'sent', deliver_time = '"+str(time_del)+"' "
+        sql+="WHERE id IN "+ids+" AND sender_id != '"+str(userID)+"' "
+        sql+="AND chat_id = '"+str(chatID)+"'"
+        mycursor.execute(sql)
+
+        mydb.commit()
+
+
+
+
 class ChatConnector:
     @staticmethod
     def getChatByid(id):
@@ -138,6 +178,34 @@ class ChatConnector:
         return data
 
 
+    @staticmethod 
+    def getChatsByIdList(ids:list, returnDic=True):
+        res={}
+        if(not returnDic):
+            res=[]
+        
+        if(not len(ids)):
+            return res
+        
+        idsStr=_convertListToSqlList(ids)
+
+
+        mycursor = mydb.cursor(dictionary=True)
+        sql="SELECT * from chats where id IN "+idsStr        
+        mycursor.execute(sql)
+
+        myresult = mycursor.fetchall()
+
+        if(returnDic):
+            for data in myresult:
+                res[str(data["id"])]=data
+        else:
+            res=myresult
+
+        return res
+        
+
+
 class UserConnector:
     @staticmethod
     def setUserOnline(userId):
@@ -192,3 +260,12 @@ class EndPoints:
             return ChatConnector.getUserIdsConnectedAdminAndOnline(userID)
         else:
             return ChatConnector.getAdminIdsConnectedUserAndOnline(userID)
+        
+    @staticmethod
+    def markMessagesFromChatAsDelivered(chatID:int, msgIds:list, userID:int, time_del):
+        MessageConnector.markMessagesFromChatAsDelivered(chatID, msgIds, userID, time_del)
+
+
+    @staticmethod 
+    def getChatsByIdList(ids:list, returnDic=True):
+        return ChatConnector.getChatsByIdList(ids, returnDic)
