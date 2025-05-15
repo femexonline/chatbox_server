@@ -7,8 +7,11 @@ from db_endpoints import ChatConnector, EndPoints
 
 
 
-chatIds=[1,2,3]
+text="0_"
 
-chatData=EndPoints.getChatsByIdList(chatIds, False)
+print(len(text))
 
-print(chatData)
+print(text.split("_"))
+
+if(text.split("_")[0]):
+    print("dddd")

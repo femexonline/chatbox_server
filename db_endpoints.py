@@ -101,20 +101,55 @@ class MessageConnector:
         return res
 
     @staticmethod
-    def markMessagesFromChatAsDelivered(chatID:int, msgIds:list, userID:int, time_del):
+    def markMessagesFromChatAsDelivered(chatID:int, msgIds_str, userID:int, time_del):
         
-        if(not len(msgIds)):
+        if(len(msgIds_str) < 2):
             return
-
-        ids=_convertListToSqlList(msgIds)
+        
+        msgIds_str=msgIds_str.split("_")
+        lastId=msgIds_str[0]
+        firstId=msgIds_str[1]
 
         mycursor = mydb.cursor()
         
 
-        # sql = "UPDATE messages SET read_status = 'delivered', deliver_time = '"+str(time_del)+"' "
-        sql = "UPDATE messages SET read_status = 'sent', deliver_time = '"+str(time_del)+"' "
-        sql+="WHERE id IN "+ids+" AND sender_id != '"+str(userID)+"' "
+        sql = "UPDATE messages SET read_status = 'delivered', deliver_time = '"+str(time_del)+"' "
+        # sql = "UPDATE messages SET read_status = 'sent', deliver_time = '"+str(time_del)+"' "
+        
+        if(firstId):
+            sql+="WHERE id >= '"+firstId+"' AND id <= '"+lastId+"' "
+        else:
+            sql+="WHERE id = '"+lastId+"' "
+
+        sql+="AND sender_id != '"+str(userID)+"' AND read_status='sent'"
         sql+="AND chat_id = '"+str(chatID)+"'"
+        mycursor.execute(sql)
+
+        mydb.commit()
+
+    @staticmethod
+    def markMessagesFromChatAsSeen(chatID:int, msgIds_str, userID:int, time_del):
+        
+        if(len(msgIds_str) < 2):
+            return
+        
+        msgIds_str=msgIds_str.split("_")
+        lastId=msgIds_str[0]
+        firstId=msgIds_str[1]
+
+        mycursor = mydb.cursor()
+        
+
+        sql = "UPDATE messages SET read_status = 'read', read_time = '"+str(time_del)+"' "
+        # sql = "UPDATE messages SET read_status = 'delivered', read_time = '"+str(time_del)+"' "
+        
+        if(firstId):
+            sql+="WHERE id >= '"+firstId+"' AND id <= '"+lastId+"' "
+        else:
+            sql+="WHERE id = '"+lastId+"' "
+
+        sql+="AND sender_id != '"+str(userID)+"' "
+        sql+="AND chat_id = '"+str(chatID)+"' AND read_status='delivered'"
         mycursor.execute(sql)
 
         mydb.commit()
@@ -262,8 +297,12 @@ class EndPoints:
             return ChatConnector.getAdminIdsConnectedUserAndOnline(userID)
         
     @staticmethod
-    def markMessagesFromChatAsDelivered(chatID:int, msgIds:list, userID:int, time_del):
-        MessageConnector.markMessagesFromChatAsDelivered(chatID, msgIds, userID, time_del)
+    def markMessagesFromChatAsDelivered(chatID:int, msgIds_str, userID:int, time_del):
+        MessageConnector.markMessagesFromChatAsDelivered(chatID, msgIds_str, userID, time_del)
+
+    @staticmethod
+    def markMessagesFromChatAsSeen(chatID:int, msgIds_str, userID:int, time_del):
+        MessageConnector.markMessagesFromChatAsSeen(chatID, msgIds_str, userID, time_del)
 
 
     @staticmethod 

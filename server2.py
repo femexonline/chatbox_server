@@ -141,11 +141,33 @@ class Pings:
                     if(not webSoc.closed):
                         await webSoc.send(json.dumps(send))
 
-    async def msgsDelivered(chatId, msgIds,  idToRecieve, idIsAdmin, time_del):
+    async def msgsDelivered(chatId, msgIds_str,  idToRecieve, idIsAdmin, time_del):
         send=[
             "msgsdelivered",
             chatId,
-            msgIds,
+            msgIds_str,
+            time_del
+        ]
+
+        user_sockets={}
+        if(idIsAdmin):
+            user_sockets=admins
+        else:
+            user_sockets=users
+
+        idToRecieve=str(idToRecieve)
+        if(idToRecieve in user_sockets):
+
+            for socId in user_sockets[idToRecieve]:
+                webSoc:WebSocketServerProtocol=user_sockets[idToRecieve][socId]
+                if(not webSoc.closed):
+                    await webSoc.send(json.dumps(send))
+    
+    async def msgsSeen(chatId, msgIds_str,  idToRecieve, idIsAdmin, time_del):
+        send=[
+            "msgsseen",
+            chatId,
+            msgIds_str,
             time_del
         ]
 
@@ -179,6 +201,9 @@ class SocketMsgRecieve:
 
         if(msg_type=="msgrecvsig"):
             await SocketMsgRecieve._msgsRecvSig(message, userid, isAdmin)
+
+        if(msg_type=="msgseensig"):
+            await SocketMsgRecieve._msgSeenSig(message, userid, isAdmin)
 
 
     @staticmethod
@@ -235,6 +260,38 @@ class SocketMsgRecieve:
                         idToRecieve=chatData[chatId]["admin_id"]
                     
                     await Pings.msgsDelivered(chatId, data[chatId], idToRecieve, not isAdmin, time_del)
+
+    @staticmethod
+    async def _msgSeenSig(message:list, senderId, isAdmin):
+        data=message[1]
+        if(not len(data)):
+           return
+
+
+        chatIds=list(data.keys())
+
+
+
+        time_del=int(time.time())
+
+        chatData=EndPoints.getChatsByIdList(chatIds)
+
+        for chatId in data:
+
+            if(chatData[chatId]):
+
+                if(chatData[chatId]["admin_id"]):
+
+                    EndPoints.markMessagesFromChatAsSeen(chatId, data[chatId], senderId, time_del)
+
+                    idToRecieve=None
+
+                    if(isAdmin):
+                        idToRecieve=chatData[chatId]["user_id"]
+                    else:
+                        idToRecieve=chatData[chatId]["admin_id"]
+                    
+                    await Pings.msgsSeen(chatId, data[chatId], idToRecieve, not isAdmin, time_del)
 
 
 
