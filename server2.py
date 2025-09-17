@@ -205,9 +205,6 @@ class SocketMsgRecieve:
         if(msg_type=="msgseensig"):
             await SocketMsgRecieve._msgSeenSig(message, userid, isAdmin)
 
-        if(msg_type=="newuserchat"):
-            await SocketMsgRecieve._newUserChat(message, userid, isAdmin)
-
 
 
     @staticmethod
@@ -297,16 +294,6 @@ class SocketMsgRecieve:
                     
                     await Pings.msgsSeen(chatId, data[chatId], idToRecieve, not isAdmin, time_del)
 
-
-    @staticmethod
-    async def _newUserChat(message:list, senderId, isAdmin):
-        data=message[1]
-        if(not len(data)):
-           return
-        
-        print(isAdmin)
-        print(senderId)
-        print(data)
 
 
 
