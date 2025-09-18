@@ -308,3 +308,7 @@ class EndPoints:
     @staticmethod 
     def getChatsByIdList(ids:list, returnDic=True):
         return ChatConnector.getChatsByIdList(ids, returnDic)
+    
+    @staticmethod
+    def getMessageByid(id):
+        return MessageConnector._getMsgById(id)
