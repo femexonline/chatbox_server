@@ -44,7 +44,10 @@ def _convertListToSqlList(lisstData:list):
 class MessageConnector:
 
     @staticmethod
-    def _getMsgById(id):
+    def _getMsgById(id, reconnect=False):
+        if(reconnect):
+            mydb.reconnect()
+
         mycursor = mydb.cursor(dictionary=True)
 
         mycursor.execute("SELECT * FROM messages WHERE id='"+str(id)+"'")
@@ -310,5 +313,5 @@ class EndPoints:
         return ChatConnector.getChatsByIdList(ids, returnDic)
     
     @staticmethod
-    def getMessageByid(id):
-        return MessageConnector._getMsgById(id)
+    def getMessageByid(id, reconnect=False):
+        return MessageConnector._getMsgById(id, reconnect)

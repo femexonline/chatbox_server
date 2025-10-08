@@ -9,9 +9,8 @@ from db_endpoints import ChatConnector, EndPoints
 
 text="0_"
 
-print(len(text))
+print(EndPoints.getMessageByid("292"))
+print(EndPoints.getMessageByid(292))
 
-print(text.split("_"))
+print(type("333"))
 
-if(text.split("_")[0]):
-    print("dddd")

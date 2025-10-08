@@ -315,14 +315,20 @@ class SocketMsgRecieve:
 
     @staticmethod
     async def _newChatStart(message:list, senderId, isAdmin):
-        msg_id=message[1]
-        
+        msg_id=message[1]        
         
         if(not msg_id):
            return
         
         
         msg=EndPoints.getMessageByid(msg_id)
+
+        index=0
+        while(not msg and index<30):
+            await asyncio.sleep(.02)
+            msg=EndPoints.getMessageByid(msg_id, True)
+            index+=1
+        
 
         if(not msg):
             return
