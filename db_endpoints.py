@@ -80,7 +80,7 @@ class MessageConnector:
 
         res={
             "isErr":False,
-            "msg":[],
+            "msg":{},
             "err":"",
         }
 
